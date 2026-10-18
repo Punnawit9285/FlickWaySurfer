@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFC21A"/>
+      <stop offset="1" stop-color="#FF5A1F"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+  <!-- the lecture -->
+  <rect x="17" y="24" width="80" height="58" rx="10" fill="none" stroke="#fff" stroke-width="9"/>
+  <!-- the gameplay window floating over it -->
+  <rect x="52" y="57" width="60" height="44" rx="9" fill="#1D2340" stroke="#fff" stroke-width="7"/>
+  <path d="M76 69.5v19l15-9.5z" fill="#fff"/>
+</svg>

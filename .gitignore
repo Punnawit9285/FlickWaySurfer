@@ -1,0 +1,9 @@
+.DS_Store
+
+# Build output: run ./build.sh
+dist/
+*.zip
+
+# Extension signing key: never commit
+*.pem
+*.crx
