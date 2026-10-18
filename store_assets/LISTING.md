@@ -10,7 +10,7 @@ Everything the [Chrome Web Store Developer Dashboard](https://chrome.google.com/
 
 ## 1. Package
 
-Run `./build.sh` in the repository root, then upload `flickwaysurfer-1.0.0.zip` (**Items → New item**).
+Run `./build.sh` in the repository root, then upload `flickwaysurfer-1.0.1.zip` (**Items → New item**).
 
 For every update, raise `version` in `manifest.json` first. The store rejects a version it has already seen.
 

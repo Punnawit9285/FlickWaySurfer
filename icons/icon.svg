@@ -1,14 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFC21A"/>
-      <stop offset="1" stop-color="#FF5A1F"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1FB3FF"/>
+      <stop offset="1" stop-color="#8FE0FF"/>
     </linearGradient>
+    <linearGradient id="train" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF7A2E"/>
+      <stop offset="1" stop-color="#F0461F"/>
+    </linearGradient>
+    <radialGradient id="coin" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#FFF1A6"/>
+      <stop offset="0.45" stop-color="#FFD02E"/>
+      <stop offset="1" stop-color="#F29A00"/>
+    </radialGradient>
+    <clipPath id="tile"><rect x="4" y="4" width="120" height="120" rx="28"/></clipPath>
   </defs>
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
-  <!-- the lecture -->
-  <rect x="17" y="24" width="80" height="58" rx="10" fill="none" stroke="#fff" stroke-width="9"/>
-  <!-- the gameplay window floating over it -->
-  <rect x="52" y="57" width="60" height="44" rx="9" fill="#1D2340" stroke="#fff" stroke-width="7"/>
-  <path d="M76 69.5v19l15-9.5z" fill="#fff"/>
+  <g clip-path="url(#tile)">
+    <!-- sky and gravel bed -->
+    <rect x="4" y="4" width="120" height="120" fill="url(#sky)"/>
+    <path d="M4 96 H124 V124 H4 Z" fill="#B87449"/>
+    <!-- rails running toward the viewer -->
+    <g stroke="#6B3F25" stroke-width="5" stroke-linecap="round">
+      <path d="M40 103 H88"/><path d="M33 114 H95"/>
+    </g>
+    <g stroke="#EEF3F8" stroke-width="5.5" stroke-linecap="round">
+      <path d="M50 96 L36 126"/><path d="M78 96 L92 126"/>
+    </g>
+    <!-- the train, head on -->
+    <rect x="27" y="22" width="74" height="80" rx="16" fill="url(#train)" stroke="#1B2140" stroke-width="5"/>
+    <rect x="36" y="31" width="56" height="29" rx="7" fill="#1B2140"/>
+    <path d="M41 36 h14 l-9 19 h-8 z" fill="#3B4A80"/>
+    <rect x="27" y="67" width="74" height="9" fill="#FFD43B"/>
+    <!-- graffiti sprayed across the front, still dripping -->
+    <g fill="none" stroke="#2FE3C5" stroke-width="5" stroke-linecap="round">
+      <path d="M33 85 C41 77 47 92 56 84 S70 76 76 85 S89 90 95 81"/>
+      <path d="M53 87 V95"/><path d="M71 82 V91"/>
+    </g>
+    <g fill="#2FE3C5"><circle cx="53" cy="96.5" r="2.6"/><circle cx="71" cy="92.5" r="2.6"/></g>
+    <circle cx="44" cy="88" r="6.5" fill="#FFF7D1" stroke="#1B2140" stroke-width="3"/>
+    <circle cx="84" cy="88" r="6.5" fill="#FFF7D1" stroke="#1B2140" stroke-width="3"/>
+  </g>
+  <!-- a coin, floating over the corner -->
+  <circle cx="99" cy="27" r="17" fill="url(#coin)" stroke="#B86A00" stroke-width="3.5"/>
+  <circle cx="99" cy="27" r="9.5" fill="none" stroke="#E08A00" stroke-width="3"/>
 </svg>
