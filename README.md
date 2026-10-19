@@ -22,6 +22,7 @@ Subway Surfers gameplay in a floating window beside your [Flick](https://flick.d
 | Hide / show | The `–` button on the title bar, the toolbar button, or **Alt+Shift+S** (⌥⇧S on a Mac). Hidden, it folds into a small orange tab on the side of the screen: click the tab to bring it back |
 | Reset | Double-click the title bar to put the window back where it started |
 | Another video | The gear on the title bar: paste any YouTube link and press **Play this video**. **Back to Subway Surfers** returns to the default. Your choice is saved, so it's still there next time |
+| Match the lecture's speed | A switch in the same settings, off at first. Switched on, the video plays at whatever speed the lecture does: 2× in Flick, 2× here. YouTube's player stops at 2×, so faster lectures get 2× |
 | Sound | It starts muted. The speaker button turns the sound on, at a low volume |
 | Fill / Fit | Crop the video to fill the window, or show all of it |
 
@@ -51,4 +52,4 @@ There's no build step for development. After editing, click the reload icon on t
 
 ## Privacy
 
-The extension stores the window's size, position and visibility, and the YouTube video you chose, in `chrome.storage.local`, and nothing else. It makes no network requests of its own. The only thing loaded from outside is YouTube's embedded player, from `youtube-nocookie.com`. See [PRIVACY.md](PRIVACY.md).
+The extension stores the window's size, position and visibility, the YouTube video you chose and the speed switch, in `chrome.storage.local`, and nothing else. It makes no network requests of its own. The only thing loaded from outside is YouTube's embedded player, from `youtube-nocookie.com`. See [PRIVACY.md](PRIVACY.md).

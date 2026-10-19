@@ -73,6 +73,7 @@
         visible: true,
         fill: true,
         videoId: null,          // null plays DEFAULT_VIDEO; anything else was chosen in settings
+        syncSpeed: false,       // play at the lecture's speed (settings)
         layouts: {
             page: { w: 320, h: 180 + BAR_H, fx: 1, fy: 1 },
             // Null until the window is moved in full screen: until then it is
@@ -80,7 +81,12 @@
             fullscreen: null,
         },
     };
-    const YT_ENDED = 0;         // player state in the IFrame API's vocabulary
+    const YT_ENDED = 0;         // player states in the IFrame API's vocabulary
+    const YT_PLAYING = 1;
+    // The embedded player's speed range. A lecture at 2.5x or 3x gets the
+    // fastest the gameplay can go.
+    const MIN_RATE = 0.25;
+    const MAX_RATE = 2;
     // The IFrame API's onError codes, in words.
     const YT_ERRORS = {
         100: 'This video is private or has been removed.',
@@ -192,12 +198,14 @@
         /* Settings, and the notice for a video that won't play: both cover the video, under the bar. */
         .panel, .notice {
             position: absolute; top: ${BAR_H}px; left: 0; right: 0; bottom: 0; overflow: auto;
-            display: flex; flex-direction: column; gap: 8px; padding: 12px;
+            display: flex; flex-direction: column; gap: 7px; padding: 10px 12px;
             border-radius: 0 0 12px 12px; background: rgba(22, 23, 30, .97);
             font-weight: 500; line-height: 1.35;
+            /* Chrome won't let a label's click flip its switch while text is selected, and
+               the link box opens with its text selected. Nothing else here needs selecting. */
+            user-select: none;
         }
         .notice { justify-content: center; align-items: center; text-align: center; }
-        .panel label { font-weight: 600; }
         .panel input {
             appearance: none; width: 100%; height: 30px; flex: none; padding: 0 9px;
             border: 1px solid rgba(255, 255, 255, .2); border-radius: 7px; outline: none;
@@ -214,6 +222,20 @@
         button.act.primary { background: linear-gradient(135deg, #ffc21a, #ff5a1f); color: #2a1300; }
         .msg { color: rgba(255, 255, 255, .62); font-size: 11.5px; }
         .msg.err { color: #ff9f8f; }
+        .panel hr { width: 100%; height: 1px; margin: 2px 0; border: 0; background: rgba(255, 255, 255, .12); flex: none; }
+        .switch { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+        .switch input { position: absolute; opacity: 0; pointer-events: none; }
+        .switch i {
+            position: relative; flex: none; width: 30px; height: 18px; border-radius: 9px;
+            background: rgba(255, 255, 255, .22); transition: background .15s ease;
+        }
+        .switch i::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+            border-radius: 50%; background: #fff; transition: transform .15s ease;
+        }
+        .switch input:checked + i { background: #ff8a1f; }
+        .switch input:checked + i::after { transform: translateX(12px); }
+        .switch input:focus-visible + i { outline: 2px solid #fff; outline-offset: 2px; }
     `;
 
     const HTML = `
@@ -231,13 +253,16 @@
                 <button class="act revert" type="button">Back to Subway Surfers</button>
             </div>
             <form class="panel" hidden>
-                <label for="fws-url">YouTube video</label>
-                <input id="fws-url" type="text" placeholder="Paste a YouTube link" spellcheck="false" autocomplete="off">
+                <input id="fws-url" type="text" placeholder="Paste a YouTube link" aria-label="YouTube link" spellcheck="false" autocomplete="off">
                 <div class="row">
                     <button class="act primary" type="submit">Play this video</button>
                     <button class="act revert" type="button">Back to Subway Surfers</button>
                 </div>
                 <span class="msg"></span>
+                <hr>
+                <label class="switch" title="At 2× in Flick, the video plays at 2× too. YouTube's player stops at 2×.">
+                    <input class="sync" type="checkbox"><i></i>Match the lecture's speed (up to 2×)
+                </label>
             </form>
             <div class="shield"></div>
             ${['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map((d) => `<div class="rz ${d}" data-dir="${d}"></div>`).join('')}
@@ -246,10 +271,12 @@
     `;
 
     let state;                   // set from storage in start()
-    let host, win, stage, bar, pill, soundBtn, fitBtn, titleEl, panel, urlInput, panelMsg, notice;
+    let host, win, stage, bar, pill, soundBtn, fitBtn, titleEl, panel, urlInput, panelMsg, notice, syncBox;
     let frame = null;
     let videoTitle = null;       // the chosen video's title, once YouTube says what it is
     let videoError = null;       // YouTube's onError code for the current video
+    let rateSent = null;         // the speed the frame was last told, or not yet
+    let playerState = null;      // the player's last reported state
     let ready = false;
     let handshake = null;
     let playing = null;          // what the frame was last told: true, false, or not yet
@@ -278,6 +305,7 @@
             visible: typeof s.visible === 'boolean' ? s.visible : DEFAULTS.visible,
             fill: typeof s.fill === 'boolean' ? s.fill : DEFAULTS.fill,
             videoId: isVideoId(s.videoId) ? s.videoId : DEFAULTS.videoId,
+            syncSpeed: typeof s.syncSpeed === 'boolean' ? s.syncSpeed : DEFAULTS.syncSpeed,
             layouts: { page: layout('page'), fullscreen: layout('fullscreen') },
         };
     }
@@ -399,6 +427,12 @@
             setVideo(id === DEFAULT_VIDEO ? null : id);
             closePanel();
         });
+        syncBox = root.querySelector('.sync');
+        syncBox.addEventListener('change', () => {
+            state.syncSpeed = syncBox.checked;
+            save();
+            syncRate();
+        });
         urlInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closePanel();
         });
@@ -419,10 +453,9 @@
     function openPanel() {
         urlInput.value = state.videoId ? `https://youtu.be/${state.videoId}` : '';
         panelMsg.classList.remove('err');
-        panelMsg.textContent = state.videoId
-            ? 'Playing your video. It stays until you change it or go back.'
-            : 'Playing Subway Surfers, the default. Paste any YouTube link to play that instead.';
+        panelMsg.textContent = state.videoId ? 'Playing your video, until you change it.' : 'Playing Subway Surfers, the default.';
         panel.querySelector('.revert').hidden = !state.videoId;
+        syncBox.checked = state.syncSpeed;
         panel.hidden = false;
         urlInput.focus();
         urlInput.select();
@@ -453,7 +486,8 @@
 
     /** The bar's title, and the notice over a video YouTube won't play here. */
     function drawVideo() {
-        titleEl.textContent = state.videoId ? (videoTitle || 'YouTube video') : DEFAULT_TITLE;
+        titleEl.textContent = (state.videoId ? (videoTitle || 'YouTube video') : DEFAULT_TITLE)
+            + (rateSent && rateSent !== 1 ? ` · ${rateSent}×` : '');
         titleEl.title = titleEl.textContent;
         notice.hidden = videoError === null;
         if (videoError !== null) {
@@ -701,6 +735,7 @@
         // over again.
         frame.addEventListener('load', () => {
             ready = false;
+            playerState = null;
             startHandshake();
         });
         stage.prepend(frame);
@@ -754,6 +789,8 @@
             // Anything asked of the player before now was dropped; catch it up.
             playing = null;
             syncPlayback();
+            rateSent = null;
+            syncRate();
             if (!muted) {
                 command('setVolume', [VOLUME]);
                 command('unMute');
@@ -773,8 +810,14 @@
 
         // `loop` restarts the video at the end, but not every embed honours it.
         // If this one stops instead, start it over from here.
-        const playerState = data.event === 'onStateChange' ? data.info
+        const reported = data.event === 'onStateChange' ? data.info
             : (data.info && typeof data.info.playerState === 'number' ? data.info.playerState : null);
+        if (reported === null || reported === playerState) return;
+        playerState = reported;
+        if (playerState === YT_PLAYING && state.syncSpeed) {
+            rateSent = null;    // a restarted or looped video can come back at 1x
+            syncRate();
+        }
         if (playerState === YT_ENDED && playing) {
             command('seekTo', [0, true]);
             command('playVideo');
@@ -787,6 +830,24 @@
         if (!ready || want === playing) return;
         playing = want;
         command(want ? 'playVideo' : 'pauseVideo');
+    }
+
+    /**
+     * Plays the video at the lecture's speed when that's switched on in
+     * settings, and at 1x when it isn't.
+     */
+    function syncRate() {
+        if (!ready) return;     // sent once the player says hello
+        let rate = 1;
+        if (state.syncSpeed) {
+            const lecture = findLecture();
+            const media = lecture && lecture.querySelector('video');
+            if (media && media.playbackRate > 0) rate = clamp(media.playbackRate, MIN_RATE, MAX_RATE);
+        }
+        if (rate === rateSent) return;
+        rateSent = rate;
+        command('setPlaybackRate', [rate]);
+        drawVideo();
     }
 
     // ─────────────────────── Watching the page ───────────────────────
@@ -803,6 +864,7 @@
         // The extension was reloaded or removed: this copy can no longer save
         // or hear the toolbar button, so take the overlay away with it.
         if (!chrome.runtime || !chrome.runtime.id) return teardown();
+        syncRate();
         const on = Boolean(findLecture());
         if (on === lectureOnScreen) return;
         lectureOnScreen = on;
@@ -825,6 +887,9 @@
             if (lectureOnScreen) place();
         });
         document.addEventListener('visibilitychange', syncPlayback);
+        // Media events don't bubble, but a capturing listener on the document
+        // still hears the lecture change speed, the moment it does.
+        document.addEventListener('ratechange', syncRate, true);
 
         chrome.runtime.onMessage.addListener((msg) => {
             if (msg && msg.type === TOGGLE && lectureOnScreen) setVisible(!state.visible);
@@ -836,6 +901,8 @@
             state = normalize(changes[STORE_KEY].newValue);
             drawButtons();
             if (videoId() !== before) loadVideo();
+            syncBox.checked = state.syncSpeed;
+            syncRate();
             if (lectureOnScreen) render();
         });
 

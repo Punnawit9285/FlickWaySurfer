@@ -10,7 +10,7 @@ Everything the [Chrome Web Store Developer Dashboard](https://chrome.google.com/
 
 ## 1. Package
 
-Run `./build.sh` in the repository root, then upload `flickwaysurfer-1.1.0.zip` (**Items → New item**).
+Run `./build.sh` in the repository root, then upload `flickwaysurfer-1.2.0.zip` (**Items → New item**).
 
 For every update, raise `version` in `manifest.json` first. The store rejects a version it has already seen.
 
@@ -36,6 +36,7 @@ FlickWaySurfer puts Subway Surfers gameplay in a small floating window beside yo
 • Starts muted and loops forever. It pauses whenever it's hidden or you leave the lecture
 • Fill or Fit: crop the gameplay to fill the window, or show all of it
 • Rather watch something else? Paste any YouTube link in the settings, and go back to Subway Surfers with one click. Your choice is saved for next time
+• Match the lecture's speed: switch it on in the settings and the gameplay speeds up with your lecture. Watching at 2×? So is Subway Surfers (up to 2×, YouTube's limit)
 • Remembers its size and spot, separately for the page and for full screen. Double-click the title bar to put it back where it started
 
 How to use
@@ -61,7 +62,7 @@ FlickWaySurfer is an unofficial fan project. It is not affiliated with, endorsed
 | Screenshot 1 | `screenshot_1_1280x800.jpg` | The lecture page, with the window in its corner |
 | Screenshot 2 | `screenshot_2_1280x800.jpg` | Full screen, with the window over the camera third |
 | Screenshot 3 | `screenshot_3_1280x800.jpg` | Split screen, with the window under the lecture |
-| Screenshot 4 | `screenshot_4_1280x800.jpg` | Settings: any YouTube video instead |
+| Screenshot 4 | `screenshot_4_1280x800.jpg` | Settings: any YouTube video, and matching the lecture's speed |
 | Small promo tile | `small_promo_440x280.jpg` | 440×280 |
 | Marquee promo tile | `marquee_promo_1400x560.jpg` | 1400×560 (optional; used if the store features it) |
 
@@ -85,13 +86,13 @@ Shows a muted, looping video (Subway Surfers gameplay by default, or any YouTube
 **Permission justification: storage**
 
 ```
-Remembers the floating window's size, position, visibility, Fill/Fit choice and the YouTube video the user picked, between visits. Stored locally with chrome.storage.local; nothing is sent anywhere.
+Remembers the floating window's size, position, visibility, Fill/Fit choice, the YouTube video the user picked and the speed-matching switch, between visits. Stored locally with chrome.storage.local; nothing is sent anywhere.
 ```
 
 **Host permission justification** (the content script on `https://flick.docchula.com/*`)
 
 ```
-The floating window is drawn on Flick lecture pages, so the content script runs on flick.docchula.com and nowhere else. On the page it only checks whether a lecture video player is on screen and where the lecture's picture is, to show and place the window. It reads no lecture content or account data.
+The floating window is drawn on Flick lecture pages, so the content script runs on flick.docchula.com and nowhere else. On the page it only checks whether a lecture video player is on screen, where the lecture's picture is and (when the user turns speed matching on) its playback speed, to show, place and pace the window. It reads no lecture content or account data.
 ```
 
 **Are you using remote code?** No, I am not using remote code.
