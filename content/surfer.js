@@ -4,7 +4,8 @@
  * Subway Surfers gameplay in a floating window beside a Flick lecture. Drag it
  * by its top bar, resize it from any edge or corner, hide it to a small tab on
  * the side of the screen — and it stays on screen when the lecture goes full
- * screen.
+ * screen. The gear on the bar swaps the gameplay for any YouTube video, and
+ * back again.
  *
  * ── Why a popover ──
  *
@@ -31,14 +32,16 @@
  * ── Why one frame, made once ──
  *
  * The YouTube frame is created the first time it is needed and is never
- * rebuilt. Hiding pauses it and showing resumes it. Commands use the IFrame
+ * rebuilt; choosing another video only points it somewhere else. Hiding pauses
+ * it and showing resumes it. Commands use the IFrame
  * API's postMessage protocol, the same one Flickémon's music player uses, since
  * MV3 cannot load YouTube's API script.
  */
 (function () {
     'use strict';
 
-    const VIDEO_ID = 'lGlFs6lEcoU';   // "Subway Surfers Gameplay for ADHD Focus"
+    const DEFAULT_VIDEO = 'lGlFs6lEcoU';    // "Subway Surfers Gameplay for ADHD Focus"
+    const DEFAULT_TITLE = 'Subway Surfers';
     const EMBED_ORIGIN = 'https://www.youtube-nocookie.com';
     const PLAYER_ID = 'flickwaysurfer';
     const STORE_KEY = 'flickwaysurfer_v1';
@@ -69,6 +72,7 @@
     const DEFAULTS = {
         visible: true,
         fill: true,
+        videoId: null,          // null plays DEFAULT_VIDEO; anything else was chosen in settings
         layouts: {
             page: { w: 320, h: 180 + BAR_H, fx: 1, fy: 1 },
             // Null until the window is moved in full screen: until then it is
@@ -77,6 +81,12 @@
         },
     };
     const YT_ENDED = 0;         // player state in the IFrame API's vocabulary
+    // The IFrame API's onError codes, in words.
+    const YT_ERRORS = {
+        100: 'This video is private or has been removed.',
+        101: "This video can't be played outside YouTube.",
+        150: "This video can't be played outside YouTube.",
+    };
 
     const ICON = (body) => `<svg viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
     const ICONS = {
@@ -85,6 +95,8 @@
         fill: ICON('<path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/>'),
         fit: ICON('<path d="M9 4v5H4m11-5v5h5m0 6h-5v5m-6 0v-5H4"/>'),
         hide: ICON('<path d="M5 12h14"/>'),
+        settings: ICON('<circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6.4"/>'
+            + '<path d="M12 2.8v2.8m0 12.8v2.8M2.8 12h2.8m12.8 0h2.8M5.5 5.5l2 2m9 9 2 2m0-13-2 2m-9 9-2 2"/>'),
         show: ICON('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/>'),
     };
 
@@ -176,26 +188,68 @@
         /* Restates the gradient so the generic button:hover tint doesn't replace it. */
         .pill:hover, .pill:focus-visible { opacity: 1; background: linear-gradient(135deg, #ffc21a, #ff5a1f); }
         .pill svg { width: 18px; height: 18px; }
+
+        /* Settings, and the notice for a video that won't play: both cover the video, under the bar. */
+        .panel, .notice {
+            position: absolute; top: ${BAR_H}px; left: 0; right: 0; bottom: 0; overflow: auto;
+            display: flex; flex-direction: column; gap: 8px; padding: 12px;
+            border-radius: 0 0 12px 12px; background: rgba(22, 23, 30, .97);
+            font-weight: 500; line-height: 1.35;
+        }
+        .notice { justify-content: center; align-items: center; text-align: center; }
+        .panel label { font-weight: 600; }
+        .panel input {
+            appearance: none; width: 100%; height: 30px; flex: none; padding: 0 9px;
+            border: 1px solid rgba(255, 255, 255, .2); border-radius: 7px; outline: none;
+            background: rgba(255, 255, 255, .08); color: #fff; font: inherit; user-select: text;
+        }
+        .panel input::placeholder { color: rgba(255, 255, 255, .45); }
+        .panel input:focus { border-color: #ffb21a; }
+        .row { display: flex; flex-wrap: wrap; gap: 6px; }
+        button.act {
+            width: auto; height: 28px; padding: 0 10px; display: inline-flex; align-items: center;
+            border-radius: 7px; background: rgba(255, 255, 255, .12); color: #fff; font-weight: 600;
+        }
+        button.act:hover { background: rgba(255, 255, 255, .22); }
+        button.act.primary { background: linear-gradient(135deg, #ffc21a, #ff5a1f); color: #2a1300; }
+        .msg { color: rgba(255, 255, 255, .62); font-size: 11.5px; }
+        .msg.err { color: #ff9f8f; }
     `;
 
     const HTML = `
         <div class="win" hidden>
             <div class="bar">
-                <span class="title">Subway Surfers</span>
+                <span class="title"></span>
                 <button class="sound" type="button"></button>
                 <button class="fit" type="button"></button>
+                <button class="gear" type="button" title="Choose the video" aria-label="Choose the video">${ICONS.settings}</button>
                 <button class="hide" type="button" title="Hide" aria-label="Hide">${ICONS.hide}</button>
             </div>
             <div class="stage"></div>
+            <div class="notice" hidden>
+                <span class="notice-text"></span>
+                <button class="act revert" type="button">Back to Subway Surfers</button>
+            </div>
+            <form class="panel" hidden>
+                <label for="fws-url">YouTube video</label>
+                <input id="fws-url" type="text" placeholder="Paste a YouTube link" spellcheck="false" autocomplete="off">
+                <div class="row">
+                    <button class="act primary" type="submit">Play this video</button>
+                    <button class="act revert" type="button">Back to Subway Surfers</button>
+                </div>
+                <span class="msg"></span>
+            </form>
             <div class="shield"></div>
             ${['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'].map((d) => `<div class="rz ${d}" data-dir="${d}"></div>`).join('')}
         </div>
-        <button class="pill" type="button" title="Show Subway Surfers" aria-label="Show Subway Surfers" hidden>${ICONS.show}</button>
+        <button class="pill" type="button" title="Show the video" aria-label="Show the video" hidden>${ICONS.show}</button>
     `;
 
     let state;                   // set from storage in start()
-    let host, win, stage, bar, pill, soundBtn, fitBtn;
+    let host, win, stage, bar, pill, soundBtn, fitBtn, titleEl, panel, urlInput, panelMsg, notice;
     let frame = null;
+    let videoTitle = null;       // the chosen video's title, once YouTube says what it is
+    let videoError = null;       // YouTube's onError code for the current video
     let ready = false;
     let handshake = null;
     let playing = null;          // what the frame was last told: true, false, or not yet
@@ -223,8 +277,39 @@
         return {
             visible: typeof s.visible === 'boolean' ? s.visible : DEFAULTS.visible,
             fill: typeof s.fill === 'boolean' ? s.fill : DEFAULTS.fill,
+            videoId: isVideoId(s.videoId) ? s.videoId : DEFAULTS.videoId,
             layouts: { page: layout('page'), fullscreen: layout('fullscreen') },
         };
+    }
+
+    const isVideoId = (v) => typeof v === 'string' && /^[\w-]{11}$/.test(v);
+    const videoId = () => state.videoId || DEFAULT_VIDEO;
+
+    /**
+     * The video ID in anything a student is likely to paste: a watch link,
+     * youtu.be, Shorts, live, embed, mobile and music links, or a bare ID.
+     */
+    function parseVideoId(text) {
+        const s = text.trim();
+        if (isVideoId(s)) return s;
+        let url;
+        try {
+            url = new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`);
+        } catch {
+            return null;
+        }
+        const site = url.hostname.replace(/^(www|m|music)\./, '');
+        let id = null;
+        if (site === 'youtu.be') {
+            id = url.pathname.split('/')[1];
+        } else if (site === 'youtube.com' || site === 'youtube-nocookie.com') {
+            id = url.searchParams.get('v');
+            if (!id) {
+                const m = url.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]{11})/);
+                id = m && m[1];
+            }
+        }
+        return isVideoId(id) ? id : null;
     }
 
     function save() {
@@ -250,11 +335,18 @@
         pill = root.querySelector('.pill');
         soundBtn = root.querySelector('.sound');
         fitBtn = root.querySelector('.fit');
+        titleEl = root.querySelector('.title');
+        panel = root.querySelector('.panel');
+        urlInput = root.querySelector('.panel input');
+        panelMsg = root.querySelector('.panel .msg');
+        notice = root.querySelector('.notice');
 
         // Clicking the overlay must not take focus from the player, or the
         // next Space or arrow key would go to one of these buttons instead of
-        // the lecture.
-        win.addEventListener('mousedown', (e) => e.preventDefault());
+        // the lecture. The link box is the exception: it has to take typing.
+        win.addEventListener('mousedown', (e) => {
+            if (e.target !== urlInput) e.preventDefault();
+        });
         pill.addEventListener('mousedown', (e) => e.preventDefault());
         // And nothing done in the overlay reaches the page. In full screen it
         // sits inside the video.js player, which would take a double-click on
@@ -295,8 +387,79 @@
             drawButtons();
         });
 
+        root.querySelector('.gear').addEventListener('click', () => (panel.hidden ? openPanel() : closePanel()));
+        panel.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = parseVideoId(urlInput.value);
+            if (!id) {
+                panelMsg.textContent = "That doesn't look like a YouTube video link.";
+                panelMsg.classList.add('err');
+                return;
+            }
+            setVideo(id === DEFAULT_VIDEO ? null : id);
+            closePanel();
+        });
+        urlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closePanel();
+        });
+        for (const btn of root.querySelectorAll('.revert')) {
+            btn.addEventListener('click', () => {
+                setVideo(null);
+                closePanel();
+            });
+        }
+
         drawButtons();
+        drawVideo();
         document.body.append(host);
+    }
+
+    // ─────────────────────── Choosing the video ───────────────────────
+
+    function openPanel() {
+        urlInput.value = state.videoId ? `https://youtu.be/${state.videoId}` : '';
+        panelMsg.classList.remove('err');
+        panelMsg.textContent = state.videoId
+            ? 'Playing your video. It stays until you change it or go back.'
+            : 'Playing Subway Surfers, the default. Paste any YouTube link to play that instead.';
+        panel.querySelector('.revert').hidden = !state.videoId;
+        panel.hidden = false;
+        urlInput.focus();
+        urlInput.select();
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        urlInput.blur();
+    }
+
+    /** Plays `id` (null for the default) here, saves it, and every other Flick tab follows. */
+    function setVideo(id) {
+        if (id === state.videoId) return;
+        state.videoId = id;
+        save();
+        loadVideo();
+    }
+
+    /** Points the frame at the current video. */
+    function loadVideo() {
+        videoTitle = null;
+        videoError = null;
+        drawVideo();
+        if (!frame) return;     // made with the right video when it's first needed
+        ready = false;          // a new player, which the frame's load event introduces itself to
+        frame.src = embedUrl(videoId());
+    }
+
+    /** The bar's title, and the notice over a video YouTube won't play here. */
+    function drawVideo() {
+        titleEl.textContent = state.videoId ? (videoTitle || 'YouTube video') : DEFAULT_TITLE;
+        titleEl.title = titleEl.textContent;
+        notice.hidden = videoError === null;
+        if (videoError !== null) {
+            notice.querySelector('.notice-text').textContent = YT_ERRORS[videoError] || "YouTube couldn't play this video.";
+            notice.querySelector('.revert').hidden = !state.videoId;
+        }
     }
 
     function drawButtons() {
@@ -324,6 +487,7 @@
     }
 
     function setVisible(visible) {
+        if (!visible) closePanel();
         state.visible = visible;
         save();
         render();
@@ -505,15 +669,14 @@
 
     // ─────────────────────── The YouTube frame ───────────────────────
 
-    function ensureFrame() {
-        if (frame) return;
+    function embedUrl(id) {
         const params = new URLSearchParams({
             autoplay: '1',
             // Muted so it can start on its own, and so the lecture keeps the sound.
             mute: '1',
             loop: '1',
             // A single video only loops as a one-item playlist of itself.
-            playlist: VIDEO_ID,
+            playlist: id,
             controls: '0',
             disablekb: '1',
             fs: '0',
@@ -523,13 +686,19 @@
             enablejsapi: '1',
             origin: location.origin,
         });
+        return `${EMBED_ORIGIN}/embed/${id}?${params}`;
+    }
+
+    function ensureFrame() {
+        if (frame) return;
         frame = document.createElement('iframe');
-        frame.src = `${EMBED_ORIGIN}/embed/${VIDEO_ID}?${params}`;
-        frame.title = 'Subway Surfers gameplay';
+        frame.src = embedUrl(videoId());
+        frame.title = 'Video player';
         frame.allow = 'autoplay; encrypted-media';
         frame.referrerPolicy = 'strict-origin-when-cross-origin';
-        // A frame that loads again (only without moveBefore) is a new player,
-        // which has to be introduced to all over again.
+        // Each load is a new player — another video was chosen, or (without
+        // moveBefore) the frame was moved — which has to be introduced to all
+        // over again.
         frame.addEventListener('load', () => {
             ready = false;
             startHandshake();
@@ -581,6 +750,7 @@
             ready = true;
             stopHandshake();
             command('addEventListener', ['onStateChange']);
+            command('addEventListener', ['onError']);
             // Anything asked of the player before now was dropped; catch it up.
             playing = null;
             syncPlayback();
@@ -588,6 +758,17 @@
                 command('setVolume', [VOLUME]);
                 command('unMute');
             }
+        }
+
+        if (data.event === 'onError') {
+            videoError = data.info;
+            drawVideo();
+        }
+        // The chosen video's title, for the bar, once the player knows it.
+        const about = data.info && data.info.videoData;
+        if (about && about.title && about.video_id === videoId() && about.title !== videoTitle) {
+            videoTitle = about.title;
+            drawVideo();
         }
 
         // `loop` restarts the video at the end, but not every embed honours it.
@@ -648,11 +829,13 @@
         chrome.runtime.onMessage.addListener((msg) => {
             if (msg && msg.type === TOGGLE && lectureOnScreen) setVisible(!state.visible);
         });
-        // Another Flick tab hid, showed or moved the window.
+        // Another Flick tab hid, showed or moved the window, or chose another video.
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area !== 'local' || !changes[STORE_KEY] || gesture) return;
+            const before = videoId();
             state = normalize(changes[STORE_KEY].newValue);
             drawButtons();
+            if (videoId() !== before) loadVideo();
             if (lectureOnScreen) render();
         });
 

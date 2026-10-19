@@ -21,19 +21,20 @@ Subway Surfers gameplay in a floating window beside your [Flick](https://flick.d
 | Resize | Drag any edge or corner |
 | Hide / show | The `–` button on the title bar, the toolbar button, or **Alt+Shift+S** (⌥⇧S on a Mac). Hidden, it folds into a small orange tab on the side of the screen: click the tab to bring it back |
 | Reset | Double-click the title bar to put the window back where it started |
+| Another video | The gear on the title bar: paste any YouTube link and press **Play this video**. **Back to Subway Surfers** returns to the default. Your choice is saved, so it's still there next time |
 | Sound | It starts muted. The speaker button turns the sound on, at a low volume |
 | Fill / Fit | Crop the video to fill the window, or show all of it |
 
 **Full screen.** The window stays on top of the lecture in full screen. Until you move it there, it sits over the bottom half of the lecture's left third, under the lecturer's camera and clear of the slides, on any screen size. Once you move or resize it in full screen, it remembers that spot, separately from the one on the page. The toolbar is hidden in full screen, so use the `–` button, the orange tab or the shortcut. To change the shortcut, go to `chrome://extensions/shortcuts`.
 
-The gameplay loops forever. It plays only while a lecture is on screen and the window is showing, and pauses when you hide it, leave the lecture, or switch tabs.
+The video loops forever. It plays only while a lecture is on screen and the window is showing, and pauses when you hide it, leave the lecture, or switch tabs.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `manifest.json` | Manifest V3. Runs on `flick.docchula.com` only, and asks for `storage` and nothing else |
-| `content/surfer.js` | The floating window: placement, drag and resize, full screen, the YouTube embed |
+| `content/surfer.js` | The floating window: placement, drag and resize, full screen, the YouTube embed and its video settings |
 | `background/service-worker.js` | The toolbar button and the keyboard shortcut |
 | `icons/` | `icon.svg` (the source) and the PNG sizes Chrome uses |
 | `build.sh` | Builds the Chrome Web Store zip |
@@ -50,4 +51,4 @@ There's no build step for development. After editing, click the reload icon on t
 
 ## Privacy
 
-The extension stores the window's size, position and visibility in `chrome.storage.local`, and nothing else. It makes no network requests of its own. The only thing loaded from outside is YouTube's embedded player, from `youtube-nocookie.com`. See [PRIVACY.md](PRIVACY.md).
+The extension stores the window's size, position and visibility, and the YouTube video you chose, in `chrome.storage.local`, and nothing else. It makes no network requests of its own. The only thing loaded from outside is YouTube's embedded player, from `youtube-nocookie.com`. See [PRIVACY.md](PRIVACY.md).

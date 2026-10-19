@@ -10,7 +10,7 @@ Everything the [Chrome Web Store Developer Dashboard](https://chrome.google.com/
 
 ## 1. Package
 
-Run `./build.sh` in the repository root, then upload `flickwaysurfer-1.0.1.zip` (**Items → New item**).
+Run `./build.sh` in the repository root, then upload `flickwaysurfer-1.1.0.zip` (**Items → New item**).
 
 For every update, raise `version` in `manifest.json` first. The store rejects a version it has already seen.
 
@@ -35,6 +35,7 @@ FlickWaySurfer puts Subway Surfers gameplay in a small floating window beside yo
 • Hide it with one click, the toolbar button or Alt+Shift+S (⌥⇧S on a Mac). It folds into a small tab at the side of the screen, ready to come back
 • Starts muted and loops forever. It pauses whenever it's hidden or you leave the lecture
 • Fill or Fit: crop the gameplay to fill the window, or show all of it
+• Rather watch something else? Paste any YouTube link in the settings, and go back to Subway Surfers with one click. Your choice is saved for next time
 • Remembers its size and spot, separately for the page and for full screen. Double-click the title bar to put it back where it started
 
 How to use
@@ -43,7 +44,7 @@ How to use
 3. Go full screen as usual, and the gameplay comes with you.
 
 Privacy
-No account, no analytics, no servers. FlickWaySurfer only stores the window's size, position and visibility on your own computer. The gameplay plays in YouTube's embedded player (youtube-nocookie.com).
+No account, no analytics, no servers. FlickWaySurfer only stores the window's size, position and visibility, and the video you chose, on your own computer. The gameplay plays in YouTube's embedded player (youtube-nocookie.com).
 
 FlickWaySurfer is an unofficial fan project. It is not affiliated with, endorsed by or connected to Docchula or Flick, or to SYBO, the maker of Subway Surfers. Subway Surfers is a trademark of SYBO. The gameplay is a YouTube video, played in YouTube's own embedded player.
 ```
@@ -60,6 +61,7 @@ FlickWaySurfer is an unofficial fan project. It is not affiliated with, endorsed
 | Screenshot 1 | `screenshot_1_1280x800.jpg` | The lecture page, with the window in its corner |
 | Screenshot 2 | `screenshot_2_1280x800.jpg` | Full screen, with the window over the camera third |
 | Screenshot 3 | `screenshot_3_1280x800.jpg` | Split screen, with the window under the lecture |
+| Screenshot 4 | `screenshot_4_1280x800.jpg` | Settings: any YouTube video instead |
 | Small promo tile | `small_promo_440x280.jpg` | 440×280 |
 | Marquee promo tile | `marquee_promo_1400x560.jpg` | 1400×560 (optional; used if the store features it) |
 
@@ -77,13 +79,13 @@ The lecture in the screenshots is made up ("Physiology I", drawn for the purpose
 **Single purpose description**
 
 ```
-Shows a muted, looping Subway Surfers gameplay video in a movable, resizable floating window on Flick lecture pages (flick.docchula.com), including while the lecture is in full screen.
+Shows a muted, looping video (Subway Surfers gameplay by default, or any YouTube video the user picks) in a movable, resizable floating window on Flick lecture pages (flick.docchula.com), including while the lecture is in full screen.
 ```
 
 **Permission justification: storage**
 
 ```
-Remembers the floating window's size, position, visibility and Fill/Fit choice between visits. Stored locally with chrome.storage.local; nothing is sent anywhere.
+Remembers the floating window's size, position, visibility, Fill/Fit choice and the YouTube video the user picked, between visits. Stored locally with chrome.storage.local; nothing is sent anywhere.
 ```
 
 **Host permission justification** (the content script on `https://flick.docchula.com/*`)
