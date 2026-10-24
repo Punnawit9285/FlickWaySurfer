@@ -1,10 +1,10 @@
 # FlickWaySurfer
 
-Subway Surfers gameplay in a floating window beside your [Flick](https://flick.docchula.com) lectures. Move it, resize it, hide it, and it stays on screen when the lecture goes full screen.
+Subway Surfers gameplay in a floating window beside your [Flick](https://flick.docchula.com) lectures, or flip to ASMR wax cracking or Minecraft like changing the channel. Move it, resize it, hide it, and it stays on screen when the lecture goes full screen.
 
 ![The lecture in full screen, with the gameplay window over the lower part of the lecturer's camera](store_assets/screenshot_2_1280x800.jpg)
 
-> **Unofficial fan project.** Not affiliated with Docchula or Flick, or with SYBO, the makers of Subway Surfers. The gameplay plays through YouTube's own embedded player ([this video](https://www.youtube.com/watch?v=lGlFs6lEcoU)), so no video is bundled here.
+> **Unofficial fan project.** Not affiliated with Docchula or Flick, with SYBO, the makers of Subway Surfers, or with Mojang, the makers of Minecraft. Every channel plays YouTube videos in YouTube's own embedded player, so no video is bundled here.
 
 ## Install
 
@@ -21,22 +21,23 @@ Subway Surfers gameplay in a floating window beside your [Flick](https://flick.d
 | Resize | Drag any edge or corner |
 | Hide / show | The `–` button on the title bar, the toolbar button, or **Alt+Shift+S** (⌥⇧S on a Mac). Hidden, it folds into a small orange tab on the side of the screen: click the tab to bring it back |
 | Reset | Double-click the title bar to put the window back where it started |
-| Another video | The gear on the title bar: paste any YouTube link and press **Play this video**. **Back to Subway Surfers** returns to the default. Your choice is saved, so it's still there next time |
+| Change the channel | The TV button on the title bar flips to the next channel: Subway Surfers, ASMR Wax Cracking, Minecraft, then round again. **Alt+Shift+D** (⌥⇧D on a Mac), the key beside the show/hide one, does the same, and brings the window back if it's hidden. To go straight to one, open the gear and pick it. The channel you're on is saved, so it's the one that plays first next time |
+| Another video | In the gear's settings, paste any YouTube link and press **Play**. It becomes a channel of its own, **Your video**, after the others |
 | Match the lecture's speed | A switch in the same settings, off at first. Switched on, the video plays at whatever speed the lecture does: 2× in Flick, 2× here. YouTube's player stops at 2×, so faster lectures get 2× |
 | Sound | It starts muted. The speaker button turns the sound on, at a low volume |
 | Fill / Fit | Crop the video to fill the window, or show all of it |
 
-**Full screen.** The window stays on top of the lecture in full screen. Until you move it there, it sits over the bottom half of the lecture's left third, under the lecturer's camera and clear of the slides, on any screen size. Once you move or resize it in full screen, it remembers that spot, separately from the one on the page. The toolbar is hidden in full screen, so use the `–` button, the orange tab or the shortcut. To change the shortcut, go to `chrome://extensions/shortcuts`.
+**Full screen.** The window stays on top of the lecture in full screen. Until you move it there, it sits over the bottom half of the lecture's left third, under the lecturer's camera and clear of the slides, on any screen size. Once you move or resize it in full screen, it remembers that spot, separately from the one on the page. The toolbar is hidden in full screen, so use the `–` button, the orange tab or the shortcut. To change the shortcuts, go to `chrome://extensions/shortcuts`.
 
-The video loops forever. It plays only while a lecture is on screen and the window is showing, and pauses when you hide it, leave the lecture, or switch tabs.
+Every channel plays forever. Subway Surfers and your own video loop. ASMR Wax Cracking and Minecraft have several videos each, and play them one after another, starting from a random one so it isn't always the same. If YouTube won't play one of them, the channel skips to the next. Nothing plays unless a lecture is on screen and the window is showing: it pauses when you hide it, leave the lecture, or switch tabs.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `manifest.json` | Manifest V3. Runs on `flick.docchula.com` only, and asks for `storage` and nothing else |
-| `content/surfer.js` | The floating window: placement, drag and resize, full screen, the YouTube embed and its video settings |
-| `background/service-worker.js` | The toolbar button and the keyboard shortcut |
+| `content/surfer.js` | The floating window: placement, drag and resize, full screen, the channels, the YouTube embed and its settings |
+| `background/service-worker.js` | The toolbar button and the keyboard shortcuts |
 | `icons/` | `icon.svg` (the source) and the PNG sizes Chrome uses |
 | `build.sh` | Builds the Chrome Web Store zip |
 | `store_assets/` | Store graphics, and `LISTING.md` with every text field the store asks for |
@@ -52,4 +53,4 @@ There's no build step for development. After editing, click the reload icon on t
 
 ## Privacy
 
-The extension stores the window's size, position and visibility, the YouTube video you chose and the speed switch, in `chrome.storage.local`, and nothing else. It makes no network requests of its own. The only thing loaded from outside is YouTube's embedded player, from `youtube-nocookie.com`. See [PRIVACY.md](PRIVACY.md).
+The extension stores the window's size, position and visibility, the channel you're on, the YouTube video you pasted and the speed switch, in `chrome.storage.local`, and nothing else. It makes no network requests of its own. The only thing loaded from outside is YouTube's embedded player, from `youtube-nocookie.com`. See [PRIVACY.md](PRIVACY.md).

@@ -4,8 +4,8 @@
  * Subway Surfers gameplay in a floating window beside a Flick lecture. Drag it
  * by its top bar, resize it from any edge or corner, hide it to a small tab on
  * the side of the screen — and it stays on screen when the lecture goes full
- * screen. The gear on the bar swaps the gameplay for any YouTube video, and
- * back again.
+ * screen. The TV button on the bar flips channels, from Subway Surfers to ASMR
+ * wax cracking to Minecraft, and the gear picks one or plays any YouTube video.
  *
  * ── Why a popover ──
  *
@@ -32,7 +32,7 @@
  * ── Why one frame, made once ──
  *
  * The YouTube frame is created the first time it is needed and is never
- * rebuilt; choosing another video only points it somewhere else. Hiding pauses
+ * rebuilt; changing the channel only points it somewhere else. Hiding pauses
  * it and showing resumes it. Commands use the IFrame
  * API's postMessage protocol, the same one Flickémon's music player uses, since
  * MV3 cannot load YouTube's API script.
@@ -40,13 +40,25 @@
 (function () {
     'use strict';
 
-    const DEFAULT_VIDEO = 'lGlFs6lEcoU';    // "Subway Surfers Gameplay for ADHD Focus"
-    const DEFAULT_TITLE = 'Subway Surfers';
+    // What the TV button on the bar flips through, in this order. The first is
+    // the default. A channel with several videos plays them one after another,
+    // from a random one each time it's tuned in, so it doesn't always open on
+    // the same one.
+    const CHANNELS = [
+        { id: 'subway', name: 'Subway Surfers', videos: ['lGlFs6lEcoU'] },  // "Subway Surfers Gameplay for ADHD Focus"
+        { id: 'asmr', name: 'ASMR Wax Cracking', videos: ['mjbM-UQ-EYw', 'bCfgZDXtm20'] },
+        { id: 'minecraft', name: 'Minecraft', videos: ['AXEkvwCAANo', '3oith-nfckE', 'XMpKeDEzMFY', 'yJ6Lbsmb1lY', 'h8UpC5JbMU0'] },
+    ];
+    // A video pasted in settings is a channel of its own, after the others.
+    const CUSTOM = 'custom';
+    const CUSTOM_NAME = 'Your video';
+    const DEFAULT_VIDEO = CHANNELS[0].videos[0];
     const EMBED_ORIGIN = 'https://www.youtube-nocookie.com';
     const PLAYER_ID = 'flickwaysurfer';
     const STORE_KEY = 'flickwaysurfer_v1';
     const HOST_ID = 'flickwaysurfer-host';
     const TOGGLE = 'flickwaysurfer:toggle';
+    const NEXT_CHANNEL = 'flickwaysurfer:next-channel';
 
     const RATIO = 16 / 9;
     const EDGE = 12;            // gap kept between the window and the screen edge
@@ -72,7 +84,8 @@
     const DEFAULTS = {
         visible: true,
         fill: true,
-        videoId: null,          // null plays DEFAULT_VIDEO; anything else was chosen in settings
+        channel: CHANNELS[0].id,    // what's on: one of CHANNELS, or CUSTOM
+        videoId: null,          // the video pasted in settings, which CUSTOM plays
         syncSpeed: false,       // play at the lecture's speed (settings)
         layouts: {
             page: { w: 320, h: 180 + BAR_H, fx: 1, fy: 1 },
@@ -104,6 +117,7 @@
         settings: ICON('<circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6.4"/>'
             + '<path d="M12 2.8v2.8m0 12.8v2.8M2.8 12h2.8m12.8 0h2.8M5.5 5.5l2 2m9 9 2 2m0-13-2 2m-9 9-2 2"/>'),
         show: ICON('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/>'),
+        channel: ICON('<rect x="3" y="7.5" width="18" height="13" rx="2.5"/><path d="m8 3 4 4.5L16 3"/>'),
     };
 
     const CSS = `
@@ -207,21 +221,22 @@
         }
         .notice { justify-content: center; align-items: center; text-align: center; }
         .panel input {
-            appearance: none; width: 100%; height: 30px; flex: none; padding: 0 9px;
+            appearance: none; flex: 1; min-width: 0; height: 30px; padding: 0 9px;
             border: 1px solid rgba(255, 255, 255, .2); border-radius: 7px; outline: none;
             background: rgba(255, 255, 255, .08); color: #fff; font: inherit; user-select: text;
         }
         .panel input::placeholder { color: rgba(255, 255, 255, .45); }
         .panel input:focus { border-color: #ffb21a; }
-        .row { display: flex; flex-wrap: wrap; gap: 6px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .link { display: flex; gap: 6px; flex: none; }
         button.act {
             width: auto; height: 28px; padding: 0 10px; display: inline-flex; align-items: center;
             border-radius: 7px; background: rgba(255, 255, 255, .12); color: #fff; font-weight: 600;
         }
         button.act:hover { background: rgba(255, 255, 255, .22); }
-        button.act.primary { background: linear-gradient(135deg, #ffc21a, #ff5a1f); color: #2a1300; }
-        .msg { color: rgba(255, 255, 255, .62); font-size: 11.5px; }
-        .msg.err { color: #ff9f8f; }
+        button.chip { height: 26px; background: rgba(255, 255, 255, .08); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+        button.chip[aria-pressed="true"] { background: linear-gradient(135deg, #ffc21a, #ff5a1f); box-shadow: none; color: #2a1300; }
+        .msg { color: #ff9f8f; font-size: 11.5px; }
         .panel hr { width: 100%; height: 1px; margin: 2px 0; border: 0; background: rgba(255, 255, 255, .12); flex: none; }
         .switch { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
         .switch input { position: absolute; opacity: 0; pointer-events: none; }
@@ -242,23 +257,24 @@
         <div class="win" hidden>
             <div class="bar">
                 <span class="title"></span>
+                <button class="channel" type="button">${ICONS.channel}</button>
                 <button class="sound" type="button"></button>
                 <button class="fit" type="button"></button>
-                <button class="gear" type="button" title="Choose the video" aria-label="Choose the video">${ICONS.settings}</button>
+                <button class="gear" type="button" title="Choose a channel" aria-label="Choose a channel">${ICONS.settings}</button>
                 <button class="hide" type="button" title="Hide" aria-label="Hide">${ICONS.hide}</button>
             </div>
             <div class="stage"></div>
             <div class="notice" hidden>
                 <span class="notice-text"></span>
-                <button class="act revert" type="button">Back to Subway Surfers</button>
+                <button class="act next" type="button">Next channel</button>
             </div>
             <form class="panel" hidden>
-                <input id="fws-url" type="text" placeholder="Paste a YouTube link" aria-label="YouTube link" spellcheck="false" autocomplete="off">
-                <div class="row">
-                    <button class="act primary" type="submit">Play this video</button>
-                    <button class="act revert" type="button">Back to Subway Surfers</button>
+                <div class="chips" role="group" aria-label="Channels"></div>
+                <div class="link">
+                    <input id="fws-url" type="text" placeholder="Or paste any YouTube link" aria-label="YouTube link" spellcheck="false" autocomplete="off">
+                    <button class="act" type="submit">Play</button>
                 </div>
-                <span class="msg"></span>
+                <span class="msg" hidden>That doesn't look like a YouTube video link.</span>
                 <hr>
                 <label class="switch" title="At 2× in Flick, the video plays at 2× too. YouTube's player stops at 2×.">
                     <input class="sync" type="checkbox"><i></i>Match the lecture's speed (up to 2×)
@@ -271,9 +287,11 @@
     `;
 
     let state;                   // set from storage in start()
-    let host, win, stage, bar, pill, soundBtn, fitBtn, titleEl, panel, urlInput, panelMsg, notice, syncBox;
+    let host, win, stage, bar, pill, channelBtn, soundBtn, fitBtn, titleEl, panel, chips, urlInput, panelMsg, notice, syncBox;
     let frame = null;
-    let videoTitle = null;       // the chosen video's title, once YouTube says what it is
+    let track = 0;               // which of the channel's videos is on
+    let failures = 0;            // the channel's videos YouTube refused in a row
+    let videoTitle = null;       // the pasted video's title, once YouTube says what it is
     let videoError = null;       // YouTube's onError code for the current video
     let rateSent = null;         // the speed the frame was last told, or not yet
     let playerState = null;      // the player's last reported state
@@ -301,17 +319,28 @@
                 fy: clamp(l.fy, 0, 1),
             };
         };
+        const pasted = isVideoId(s.videoId) ? s.videoId : DEFAULTS.videoId;
+        // Saved before there were channels, a pasted video was simply what was on.
+        const wanted = s.channel === undefined && pasted ? CUSTOM : s.channel;
         return {
             visible: typeof s.visible === 'boolean' ? s.visible : DEFAULTS.visible,
             fill: typeof s.fill === 'boolean' ? s.fill : DEFAULTS.fill,
-            videoId: isVideoId(s.videoId) ? s.videoId : DEFAULTS.videoId,
+            channel: lineup(pasted).some((c) => c.id === wanted) ? wanted : DEFAULTS.channel,
+            videoId: pasted,
             syncSpeed: typeof s.syncSpeed === 'boolean' ? s.syncSpeed : DEFAULTS.syncSpeed,
             layouts: { page: layout('page'), fullscreen: layout('fullscreen') },
         };
     }
 
     const isVideoId = (v) => typeof v === 'string' && /^[\w-]{11}$/.test(v);
-    const videoId = () => state.videoId || DEFAULT_VIDEO;
+
+    /** The channels in flipping order: the built-in ones, then the pasted video's, once there is one. */
+    const lineup = (pasted = state.videoId) => (pasted
+        ? [...CHANNELS, { id: CUSTOM, name: CUSTOM_NAME, videos: [pasted] }]
+        : CHANNELS);
+    const channel = () => lineup().find((c) => c.id === state.channel) || CHANNELS[0];
+    const videoId = () => channel().videos[track % channel().videos.length];
+    const randomTrack = () => Math.floor(Math.random() * channel().videos.length);
 
     /**
      * The video ID in anything a student is likely to paste: a watch link,
@@ -361,10 +390,12 @@
         stage = root.querySelector('.stage');
         bar = root.querySelector('.bar');
         pill = root.querySelector('.pill');
+        channelBtn = root.querySelector('.channel');
         soundBtn = root.querySelector('.sound');
         fitBtn = root.querySelector('.fit');
         titleEl = root.querySelector('.title');
         panel = root.querySelector('.panel');
+        chips = root.querySelector('.chips');
         urlInput = root.querySelector('.panel input');
         panelMsg = root.querySelector('.panel .msg');
         notice = root.querySelector('.notice');
@@ -399,6 +430,7 @@
 
         root.querySelector('.hide').addEventListener('click', () => setVisible(false));
         pill.addEventListener('click', () => setVisible(true));
+        channelBtn.addEventListener('click', nextChannel);
         soundBtn.addEventListener('click', () => {
             muted = !muted;
             if (muted) command('mute');
@@ -419,12 +451,15 @@
         panel.addEventListener('submit', (e) => {
             e.preventDefault();
             const id = parseVideoId(urlInput.value);
-            if (!id) {
-                panelMsg.textContent = "That doesn't look like a YouTube video link.";
-                panelMsg.classList.add('err');
-                return;
-            }
-            setVideo(id === DEFAULT_VIDEO ? null : id);
+            panelMsg.hidden = Boolean(id);
+            if (!id) return;
+            playLink(id);
+            closePanel();
+        });
+        chips.addEventListener('click', (e) => {
+            const chip = e.target.closest('.chip');
+            if (!chip) return;
+            tune(chip.dataset.channel);
             closePanel();
         });
         syncBox = root.querySelector('.sync');
@@ -436,25 +471,18 @@
         urlInput.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closePanel();
         });
-        for (const btn of root.querySelectorAll('.revert')) {
-            btn.addEventListener('click', () => {
-                setVideo(null);
-                closePanel();
-            });
-        }
+        notice.querySelector('.next').addEventListener('click', nextChannel);
 
         drawButtons();
         drawVideo();
         document.body.append(host);
     }
 
-    // ─────────────────────── Choosing the video ───────────────────────
+    // ─────────────────────── Channels ───────────────────────
 
     function openPanel() {
         urlInput.value = state.videoId ? `https://youtu.be/${state.videoId}` : '';
-        panelMsg.classList.remove('err');
-        panelMsg.textContent = state.videoId ? 'Playing your video, until you change it.' : 'Playing Subway Surfers, the default.';
-        panel.querySelector('.revert').hidden = !state.videoId;
+        panelMsg.hidden = true;
         syncBox.checked = state.syncSpeed;
         panel.hidden = false;
         urlInput.focus();
@@ -466,11 +494,45 @@
         urlInput.blur();
     }
 
-    /** Plays `id` (null for the default) here, saves it, and every other Flick tab follows. */
-    function setVideo(id) {
-        if (id === state.videoId) return;
-        state.videoId = id;
+    /**
+     * Switches to channel `id` here and saves it: every other Flick tab
+     * follows, and it's the channel that's on next time.
+     */
+    function tune(id) {
+        if (id === state.channel) return;
+        state.channel = id;
         save();
+        tuneIn();
+    }
+
+    /** The channel after the one that's on, round to the first after the last. */
+    function upNext() {
+        const all = lineup();
+        return all[(all.findIndex((c) => c.id === state.channel) + 1) % all.length];
+    }
+
+    const nextChannel = () => tune(upNext().id);
+
+    /** Plays a pasted video, on its own channel. Pasting the default's own link just goes back to it. */
+    function playLink(id) {
+        if (id === DEFAULT_VIDEO) return tune(CHANNELS[0].id);
+        if (id === state.videoId) return tune(CUSTOM);
+        state.videoId = id;
+        state.channel = CUSTOM;
+        save();
+        tuneIn();
+    }
+
+    /** Starts the channel that's on, from a random one of its videos. */
+    function tuneIn() {
+        track = randomTrack();
+        failures = 0;
+        loadVideo();
+    }
+
+    /** Moves on to the channel's next video, round to the first after the last. */
+    function nextVideo() {
+        track = (track + 1) % channel().videos.length;
         loadVideo();
     }
 
@@ -481,18 +543,40 @@
         drawVideo();
         if (!frame) return;     // made with the right video when it's first needed
         ready = false;          // a new player, which the frame's load event introduces itself to
-        frame.src = embedUrl(videoId());
+        frame.src = embedUrl();
     }
 
-    /** The bar's title, and the notice over a video YouTube won't play here. */
+    /**
+     * What's on: the channel in the bar's title, where the TV button goes
+     * next, the channel list in settings, and the notice over a video YouTube
+     * won't play here.
+     */
     function drawVideo() {
-        titleEl.textContent = (state.videoId ? (videoTitle || 'YouTube video') : DEFAULT_TITLE)
+        const on = channel();
+        titleEl.textContent = (on.id === CUSTOM ? (videoTitle || on.name) : on.name)
             + (rateSent && rateSent !== 1 ? ` · ${rateSent}×` : '');
         titleEl.title = titleEl.textContent;
+
+        const label = `Next channel: ${upNext().name}`;
+        channelBtn.title = label;
+        channelBtn.setAttribute('aria-label', label);
+        // Rebuilt only when the lineup grows, so a redraw mid-click can't swallow the click.
+        const all = lineup();
+        if (chips.children.length !== all.length) {
+            chips.replaceChildren(...all.map((c) => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'act chip';
+                chip.dataset.channel = c.id;
+                chip.textContent = c.name;
+                return chip;
+            }));
+        }
+        for (const chip of chips.children) chip.setAttribute('aria-pressed', String(chip.dataset.channel === on.id));
+
         notice.hidden = videoError === null;
         if (videoError !== null) {
             notice.querySelector('.notice-text').textContent = YT_ERRORS[videoError] || "YouTube couldn't play this video.";
-            notice.querySelector('.revert').hidden = !state.videoId;
         }
     }
 
@@ -703,14 +787,12 @@
 
     // ─────────────────────── The YouTube frame ───────────────────────
 
-    function embedUrl(id) {
+    function embedUrl() {
+        const id = videoId();
         const params = new URLSearchParams({
             autoplay: '1',
             // Muted so it can start on its own, and so the lecture keeps the sound.
             mute: '1',
-            loop: '1',
-            // A single video only loops as a one-item playlist of itself.
-            playlist: id,
             controls: '0',
             disablekb: '1',
             fs: '0',
@@ -720,17 +802,24 @@
             enablejsapi: '1',
             origin: location.origin,
         });
+        // A channel's only video loops, which a single video does only as a
+        // one-item playlist of itself. A channel with several moves on to the
+        // next one at the end instead (see onFrameMessage).
+        if (channel().videos.length === 1) {
+            params.set('loop', '1');
+            params.set('playlist', id);
+        }
         return `${EMBED_ORIGIN}/embed/${id}?${params}`;
     }
 
     function ensureFrame() {
         if (frame) return;
         frame = document.createElement('iframe');
-        frame.src = embedUrl(videoId());
+        frame.src = embedUrl();
         frame.title = 'Video player';
         frame.allow = 'autoplay; encrypted-media';
         frame.referrerPolicy = 'strict-origin-when-cross-origin';
-        // Each load is a new player — another video was chosen, or (without
+        // Each load is a new player — another channel or video, or (without
         // moveBefore) the frame was moved — which has to be introduced to all
         // over again.
         frame.addEventListener('load', () => {
@@ -798,27 +887,32 @@
         }
 
         if (data.event === 'onError') {
+            // A channel with other videos skips to the next, until it has tried them all.
+            if (++failures < channel().videos.length) return nextVideo();
             videoError = data.info;
             drawVideo();
         }
-        // The chosen video's title, for the bar, once the player knows it.
+        // The pasted video's title, for the bar, once the player knows it.
         const about = data.info && data.info.videoData;
         if (about && about.title && about.video_id === videoId() && about.title !== videoTitle) {
             videoTitle = about.title;
             drawVideo();
         }
 
-        // `loop` restarts the video at the end, but not every embed honours it.
-        // If this one stops instead, start it over from here.
+        // `loop` restarts a lone video at the end, but not every embed honours
+        // it. If this one stops instead, start it over from here. A channel
+        // with several videos moves on to the next.
         const reported = data.event === 'onStateChange' ? data.info
             : (data.info && typeof data.info.playerState === 'number' ? data.info.playerState : null);
         if (reported === null || reported === playerState) return;
         playerState = reported;
+        if (playerState === YT_PLAYING) failures = 0;
         if (playerState === YT_PLAYING && state.syncSpeed) {
             rateSent = null;    // a restarted or looped video can come back at 1x
             syncRate();
         }
         if (playerState === YT_ENDED && playing) {
+            if (channel().videos.length > 1) return nextVideo();
             command('seekTo', [0, true]);
             command('playVideo');
         }
@@ -880,6 +974,7 @@
 
     function start(saved) {
         state = normalize(saved);
+        track = randomTrack();
         build();
         window.addEventListener('message', onFrameMessage);
         document.addEventListener('fullscreenchange', onFullscreenChange);
@@ -892,15 +987,25 @@
         document.addEventListener('ratechange', syncRate, true);
 
         chrome.runtime.onMessage.addListener((msg) => {
-            if (msg && msg.type === TOGGLE && lectureOnScreen) setVisible(!state.visible);
+            if (!msg || !lectureOnScreen) return;
+            if (msg.type === TOGGLE) setVisible(!state.visible);
+            // Changing the channel is for watching it, so a hidden window comes back too.
+            if (msg.type === NEXT_CHANNEL) {
+                nextChannel();
+                if (!state.visible) setVisible(true);
+            }
         });
-        // Another Flick tab hid, showed or moved the window, or chose another video.
+        // Another Flick tab hid, showed or moved the window, or changed the channel.
         chrome.storage.onChanged.addListener((changes, area) => {
             if (area !== 'local' || !changes[STORE_KEY] || gesture) return;
-            const before = videoId();
+            const before = channel();
             state = normalize(changes[STORE_KEY].newValue);
             drawButtons();
-            if (videoId() !== before) loadVideo();
+            const after = channel();
+            // A tab that moves on to a channel's next video saves nothing, so
+            // a change here is a new channel, or a new pasted video.
+            if (after.id !== before.id || after.videos[0] !== before.videos[0]) tuneIn();
+            else drawVideo();
             syncBox.checked = state.syncSpeed;
             syncRate();
             if (lectureOnScreen) render();
